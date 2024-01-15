@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+enum VoteType {
+  UP
+  DOWN
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  USER
+  FACULTY
+  MODERATOR
+  ADMIN
+  SUPERADMIN
+}
+
+model User {
+  id                   String         @id @default(cuid())
+  name                 String?
+  email                String         @unique
+  password             String?
+  phone                String?
+  city                 String?
+  country              String?
+  emailVerified        DateTime?
+  createdOrganizations Organization[] @relation("CreatedBy")
+  subscriptions        Subscription[]
+  votes                Vote[]
+  username             String?        @unique
+  image                String?
+  accounts             Account[]
+  sessions             Session[]
+  Post                 Post[]
+  Comment              Comment[]
+  CommentVote          CommentVote[]
+  topics               Topic[]
+  role                 Role           @default(USER)
+}
+
+model Organization {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  formalName  String?
+  description String?
+  country     String?
+  city        String?
+  location    String?
+  orgType     String?
+  image       String?
+  banner      String?
+  website     String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  posts       Post[]
+  creatorId   String
+  Creator     User           @relation("CreatedBy", fields: [creatorId], references: [id])
+  subscribers Subscription[]
+  topics      Topic[]
+  isPrivate   Boolean        @default(false)
+
+  @@index([name])
+}
+
+model Topic {
+  id             String       @id @default(cuid())
+  name           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  posts          Post[]
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  User           User         @relation(fields: [userId], references: [id])
+  userId         String
+  isPrivate      Boolean      @default(false)
+
+  @@index([name])
+}
+
+model Subscription {
+  user           User         @relation(fields: [userId], references: [id])
+  userId         String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  role           Role         @default(USER)
+  uid            String?
+  position       String?
+  department     String       @default("General")
+  phone          String?
+  uname          String?
+
+  @@id([userId, organizationId])
+}
+
+enum PostType {
+  DEFAULT
+  FILE
+}
+
+model Post {
+  id             String       @id @default(cuid())
+  title          String
+  content        Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  author         User         @relation(fields: [authorId], references: [id])
+  authorId       String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  comments       Comment[]
+  votes          Vote[]
+  Topic          Topic        @relation(fields: [topicId], references: [id])
+  topicId        String
+  postType       PostType     @default(DEFAULT)
+  files          Json?
+  disabled       Boolean      @default(false)
+  suspended      Boolean      @default(false)
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  text      String
+  createdAt DateTime      @default(now())
+  author    User          @relation(fields: [authorId], references: [id])
+  authorId  String
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  votes     CommentVote[]
+  commentId String?
+}
+
+model Vote {
+  user   User     @relation(fields: [userId], references: [id])
+  userId String
+  post   Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+  type   VoteType
+
+  @@id([userId, postId])
+}
+
+model CommentVote {
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId String
+  type      VoteType
+
+  @@id([userId, commentId])
+}
